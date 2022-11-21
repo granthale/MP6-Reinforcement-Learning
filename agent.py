@@ -51,11 +51,69 @@ class Agent:
         '''
         s_prime = self.generate_state(environment)
 
-        # TODO: write your function here
+        # 1. Choose optimal action based on Q-value (or if it has not been explored enough times)
+            # action = argmax( f(Q(s,a), N(s,a)) )
+                # f( Q(s,a), N(s,a) ) = 1 if N(s,a) < N_e
+                # else                = Q(s,a)
+        
+
+        # 2. From the result of the action on the environment, the agent obtains a reward r_t
+            # if food_pellet_found: 
+                # r_t = 1
+            # if snake_dies: 
+                # r_t = -1
+                # and self.reset()
+            # else: 
+                # r_t = -0.1
+
+
+        # 3. The agent then “discretizes” this new environment by generating a state based off of the new, post-action environment
+        s_prime = self.generate_state(environment)
+
+
+        # 4. With s_t, a_t, r_t, and s_t+1, the agent can update its Q-value estimate for the state action pair Q(s_t, a_t)
+            # a. Update N(s_t, a_t)
+            # b. Update Q(s_t, a_t)
+
+
+        # 5. The agent is now in state s_t+1, and the process repeats
+            # Repeat
+
 
         return utils.RIGHT
 
+    # Helper function to generate a state given an environment 
     def generate_state(self, environment):
-        # TODO: Implement this helper function that generates a state given an environment 
+        # Each state in the MDP is a tuple of the form returned
+        
+        food_dir_x = 0
+        if environment[0] < environment[3]:
+            food_dir_x = 1 # if head on the left
+        elif environment[0] > environment[3]:
+            food_dir_x = 2 # if head on the right
+        
+        food_dir_y = 0
+        if environment[1] < environment[4]:
+            food_dir_y = 1 # if head below food
+        elif environment[1] > environment[4]:
+            food_dir_y = 2 # if head above food
 
-        return None
+        adjoining_wall_x = 0
+        if environment[0] == 1:
+            adjoining_wall_x = 1 # if wall on left of head
+        if environment[0] == utils.DISPLAY_WIDTH - 2:
+            adjoining_wall_x = 2 # if wall on right of head
+
+        adjoining_wall_y = 0
+        if environment[1] == 1:
+            adjoining_wall_y = 1 # if wall above head
+        if environment[1] == utils.DISPLAY_HEIGHT - 2:
+            adjoining_wall_x = 2 # if wall below head
+
+        # TODO Check where the snake's body is in relation to it's head
+        adjoining_body_top = 0
+        adjoining_body_bottom = 0
+        adjoining_body_left = 0
+        adjoining_body_right = 0
+
+        return (food_dir_x, food_dir_y, adjoining_wall_x, adjoining_wall_y, adjoining_body_top, adjoining_body_bottom, adjoining_body_left, adjoining_body_right)
