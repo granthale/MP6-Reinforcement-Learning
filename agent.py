@@ -51,7 +51,7 @@ class Agent:
         '''
         s_prime = self.generate_state(environment)
 
-        # 1. Choose optimal action based on Q-value (or if it has not been explored enough times)
+        # 1. Choose optimal action based on Q-value or lack of exploration
             # action = argmax( f(Q(s,a), N(s,a)) )
                 # f( Q(s,a), N(s,a) ) = 1 if N(s,a) < N_e
                 # else                = Q(s,a)
@@ -83,37 +83,52 @@ class Agent:
         return utils.RIGHT
 
     # Helper function to generate a state given an environment 
+    # Each state in the MDP is a tuple of the form returned
     def generate_state(self, environment):
-        # Each state in the MDP is a tuple of the form returned
+
+        snake_head_x = environment[0]
+        snake_head_y = environment[1]
+        snake_body = environment[2]
+        food_x = environment[3]
+        food_y = environment[4]
         
         food_dir_x = 0
-        if environment[0] < environment[3]:
+        if snake_head_x < food_x:
             food_dir_x = 1 # if head on the left
-        elif environment[0] > environment[3]:
+        elif snake_head_x > food_x:
             food_dir_x = 2 # if head on the right
         
         food_dir_y = 0
-        if environment[1] < environment[4]:
+        if snake_head_y < food_y:
             food_dir_y = 1 # if head below food
-        elif environment[1] > environment[4]:
+        elif snake_head_y > food_y:
             food_dir_y = 2 # if head above food
 
         adjoining_wall_x = 0
-        if environment[0] == 1:
+        if snake_head_x == 1:
             adjoining_wall_x = 1 # if wall on left of head
-        if environment[0] == utils.DISPLAY_WIDTH - 2:
+        if snake_head_x == utils.DISPLAY_WIDTH - 2:
             adjoining_wall_x = 2 # if wall on right of head
 
         adjoining_wall_y = 0
-        if environment[1] == 1:
+        if snake_head_y == 1:
             adjoining_wall_y = 1 # if wall above head
-        if environment[1] == utils.DISPLAY_HEIGHT - 2:
+        if snake_head_y == utils.DISPLAY_HEIGHT - 2:
             adjoining_wall_x = 2 # if wall below head
 
-        # TODO Check where the snake's body is in relation to it's head
+        # Check where the snake's body is in relation to it's head
         adjoining_body_top = 0
         adjoining_body_bottom = 0
         adjoining_body_left = 0
         adjoining_body_right = 0
+        for coord in snake_body:
+            if coord[1] - snake_head_y == 1 and coord[0] == snake_head_x:
+                adjoining_body_top = 1
+            if coord[1] - snake_head_y == -1 and coord[0] == snake_head_x:
+                adjoining_body_bottom = 1
+            if coord[0] - snake_head_x == 1 and coord[1] == snake_head_y:
+                adjoining_body_left = 1
+            if coord[0] - snake_head_x == -1 and coord[1] == snake_head_y:
+                adjoining_body_right = 1
 
         return (food_dir_x, food_dir_y, adjoining_wall_x, adjoining_wall_y, adjoining_body_top, adjoining_body_bottom, adjoining_body_left, adjoining_body_right)
