@@ -54,7 +54,15 @@ class Agent:
                 argmax_list[action] = self.Q[s_prime][action]
         
         # Choose the action at s_prime that maximizes it's Q-value
-        return argmax_list.index( max(argmax_list) )
+        max = argmax_list[0]
+        best_action = action_list[0]
+
+        for idx, val in enumerate(argmax_list):
+            if val > max:
+                max = argmax_list
+                best_action = action_list[idx]
+
+        return best_action
     
     # Helper function to determine if food pellet has been found
     def food_pellet_found(self, environment, a_prime):
@@ -145,7 +153,6 @@ class Agent:
         s_prime = self.generate_state(environment)
 
         # TODO Double check that the snake is not past the border walls
-        # TODO Only train model during training
         # TODO Update points
         
         # 1. Choose optimal action based on Q-value or lack of exploration
@@ -165,7 +172,7 @@ class Agent:
         s_double_prime = self.discretize_new_environment(environment, a_prime)
 
         # 4. With s_t, a_t, r_t, and s_t+1, the agent can update its Q-value estimate for the state action pair Q(s_t, a_t)
-        self.update_q_n(s_prime, a_prime)
+        if self._train: self.update_q_n(s_prime, a_prime)
 
         # 5. The agent is now in state s_t+1, and the process repeats
         if r_t == -1: # if snake dead
