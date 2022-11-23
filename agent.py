@@ -11,8 +11,8 @@ class Agent:
         self.reset()
         # Create the Q Table to work with
         self.Q = utils.create_q_table()
-        self.N = utils.create_q_table()
-        
+        self.N = utils.create_q_table()     
+ 
     def train(self):
         self._train = True
         
@@ -37,9 +37,30 @@ class Agent:
         self.points = 0
         self.s = None
         self.a = None
+   
+    def find_best_action(self, s_prime):
+        # 1. Choose optimal action based on Q-value or lack of exploration
+            # action = argmax( f(Q(s,a), N(s,a)) )
+                # f( Q(s,a), N(s,a) ) = 1 if N(s,a) < N_e
+                # else                = Q(s,a)
+        
+        # TODO ensure tiebreaking is working correctly
+        argmax_list = [0,0,0,0]
+        action_list = [utils.RIGHT, utils.LEFT, utils.DOWN, utils.UP]
+        for action in action_list:
+            if self.N[s_prime][action] < self.Ne:
+                argmax_list[action] = 1
+            else:
+                argmax_list[action] = self.Q[s_prime][action]
+        
+        # Choose the action at s_prime that maximizes it's Q-value
+        return argmax_list.index( max(argmax_list) )
     
     # Helper function to determine if food pellet has been found
     def food_pellet_found(self, environment, a_prime):
+        head_x = environment[0]
+        head_y = environment[1]
+
         if a_prime == utils.RIGHT:
             head_x = environment[0] + 1
         elif a_prime == utils.LEFT:
@@ -53,18 +74,61 @@ class Agent:
             return True
         return False
 
-    # TODO Helper function to determine if snake dies
-    def snake_dead(self, environment, a_prime):
+    # Helper function to determine if snake dies
+    def snake_dead(self, s_prime, a_prime):
+        # state = (food_dir_x, food_dir_y, adjoining_wall_x, adjoining_wall_y, adjoining_body_top, adjoining_body_bottom, adjoining_body_left, adjoining_body_right)
         
-        return False
-    
-    # Helper function to retrieve n
-    def get_n(self, state, action):
-        return self.N[state[0]][state[1]][state[2]][state[3]][state[4]][state[5]][state[6]][state[7]][action]
+        # If snake runs into a wall
+        if (s_prime[2] == 1 and a_prime == utils.LEFT) or (s_prime[2] == 2 and a_prime == utils.RIGHT) or (s_prime[3] == 1 and a_prime == utils.UP) or (s_prime[3] == 2 and a_prime == utils.DOWN):
+            return True
+        
+        # If snake runs into it's own body
+        if (s_prime[4] == 1 and a_prime == utils.UP) or (s_prime[5] == 1 and a_prime == utils.DOWN) or (s_prime[6] == 1 and a_prime == utils.LEFT) or (s_prime[7] == 1 and a_prime == utils.RIGHT):
+            return True
 
-    # Helper function to retrieve q
-    def get_q(self, state, action):
-        return self.Q[state[0]][state[1]][state[2]][state[3]][state[4]][state[5]][state[6]][state[7]][action]
+        # TODO track how many steps the snake has taken, ensure it's less than (8 * WIDTH * HEIGHT)
+
+        return False
+
+    def calculate_reward(self, environment, s_prime, a_prime):
+        # 2. From the result of the action on the environment, the agent obtains a reward r_t
+        # if food_pellet_found: 
+                # r_t = 1
+            # if snake_dies:
+                # r_t = -1
+                # and self.reset()
+            # else: 
+                # r_t = -0.1
+            # Update points
+        r_t = -.1
+        if self.food_pellet_found(environment, a_prime):
+            r_t = 1
+        elif self.snake_dead(s_prime, a_prime):
+            r_t = -1
+        return r_t
+
+    def discretize_new_environment(self, environment, a_prime):
+        # 3. The agent then “discretizes” this new environment by generating a state based off of the new, post-action environment
+        if a_prime == utils.RIGHT:
+            environment[0] += 1
+        elif a_prime == utils.LEFT:
+            environment[0] -= 1
+        elif a_prime == utils.DOWN:
+            environment[1] += 1
+        elif a_prime == utils.UP:
+            environment[1] -= 1
+        
+        return self.generate_state(environment)
+
+    def update_q_n(self, s_prime, a_prime):
+        # 4. With s_t, a_t, r_t, and s_t+1, the agent can update its Q-value estimate for the state action pair Q(s_t, a_t)
+        
+        # a. Update N(s_t, a_t)
+        self.N[self.s][self.a] += 1
+        # b. Update Q(s_t, a_t)
+        alpha = self.C / ( self.C + self.N[s_prime][a_prime] ) 
+        self.Q[self.s][self.a] = self.Q[self.s][self.a] + alpha * (self.points - self.Q[self.s][self.a] + self.gamma * self.Q[s_prime][a_prime] )
+
 
     def act(self, environment, points, dead):
         '''
@@ -80,67 +144,39 @@ class Agent:
         # state = (food_dir_x, food_dir_y, adjoining_wall_x, adjoining_wall_y, adjoining_body_top, adjoining_body_bottom, adjoining_body_left, adjoining_body_right)
         s_prime = self.generate_state(environment)
 
-        # TODO t = 0
-
+        # TODO Double check that the snake is not past the border walls
+        # TODO Only train model during training
+        # TODO Update points
+        
         # 1. Choose optimal action based on Q-value or lack of exploration
-            # action = argmax( f(Q(s,a), N(s,a)) )
-                # f( Q(s,a), N(s,a) ) = 1 if N(s,a) < N_e
-                # else                = Q(s,a)
-        argmax_list = [0,0,0,0]
-        action_list = [utils.RIGHT, utils.LEFT, utils.DOWN, utils.UP]
-        for action in action_list:
-            if self.get_n(s_prime, action) < self.Ne:
-                argmax_list[action] = 1
-            else:
-                argmax_list[action] = self.get_q(s_prime, action)
-
-        # Chooses the action at s_prime that maximizes it's Q-value (or explores)
-        a_prime = argmax_list.index(max(argmax_list))
+        a_prime = self.find_best_action(s_prime)
 
         # 2. From the result of the action on the environment, the agent obtains a reward r_t
-            # if food_pellet_found: 
-                # r_t = 1
-            # if snake_dies: 
-                # r_t = -1
-                # and self.reset()
-            # else: 
-                # r_t = -0.1
-            # Update points
-        
-        # TODO self.a or a_prime?
-        r_t = -0.1
-        if self.food_pellet_found(environment, self.a):
-            r_t = 1
-        elif self.snake_dead(environment, self.a): # TODO
-            r_t = -1
-            self.reset()
+        r_t = self.calculate_reward(environment, s_prime, a_prime)
+
+        # When t = 0, initialize state and action, disregarding N and Q-table updating
+        if self.s == None and self.a == None:
+            self.s = s_prime
+            self.a = a_prime
+            self.points = r_t
+            return a_prime
 
         # 3. The agent then “discretizes” this new environment by generating a state based off of the new, post-action environment
-        if a_prime == utils.RIGHT:
-            environment[0] += 1
-        elif a_prime == utils.LEFT:
-            environment[0] -= 1
-        elif a_prime == utils.DOWN:
-            environment[1] += 1
-        elif a_prime == utils.UP:
-            environment[1] -= 1
-        s_double_prime = self.generate_state(environment)
+        s_double_prime = self.discretize_new_environment(environment, a_prime)
 
         # 4. With s_t, a_t, r_t, and s_t+1, the agent can update its Q-value estimate for the state action pair Q(s_t, a_t)
-            # a. Update N(s_t, a_t)
-            # b. Update Q(s_t, a_t)
+        self.update_q_n(s_prime, a_prime)
 
-        self.N[s_prime[0]][s_prime[1]][s_prime[2]][s_prime[3]][s_prime[4]][s_prime[5]][s_prime[6]][s_prime[7]][a_prime] += 1
-        
-        # TODO s_prime or self.s?
-        alpha = self.C / (self.C + self.get_n(s_prime, a_prime))
-        self.Q[self.s[0]][self.s[1]][self.s[2]][self.s[3]][self.s[4]][self.s[5]][self.s[6]][self.s[7]][self.a] = self.get_q(self.s, self.a) + alpha * (r_t - self.get_q(self.s, self.a) + self.gamma * self.get_q(s_prime, a_prime) )
+        # 5. The agent is now in state s_t+1, and the process repeats
+        if r_t == -1: # if snake dead
+            self.reset()
+        else:
+            self.points = r_t
+            self.s = s_prime
+            self.a = a_prime
 
-        # 5. TODO The agent is now in state s_t+1, and the process repeats
-        self.s = s_prime
-        self.a = a_prime
+        return a_prime
 
-        return utils.RIGHT
 
     # Helper function to generate a state given an environment 
     # Each state in the MDP is a tuple of the form returned
