@@ -73,14 +73,14 @@ class Agent:
             r_t = 1
         return r_t
 
-    def update_q_n(self, s_prime, a_prime, dead, r_t):
+    def update_q_n(self, r_t, s_prime, a_prime):
         # a. Update N(s_t, a_t)
-        self.N[s_prime][a_prime] += 1
+        self.N[self.s][self.a] += 1
 
         # b. Update Q(s_t, a_t)
         alpha = self.C / ( self.C + self.N[self.s][self.a] )     
-        if dead: # Is this correct?
-            self.Q[self.s][self.a] += alpha * (r_t - self.Q[self.s][self.a] + self.gamma * 0 )
+        if r_t == -1: # if dead
+            self.Q[self.s][self.a] += alpha * (r_t - self.Q[self.s][self.a]) # Assuming no next move
         else:
             self.Q[self.s][self.a] += alpha * (r_t - self.Q[self.s][self.a] + self.gamma * self.Q[s_prime][a_prime] )
 
@@ -96,30 +96,29 @@ class Agent:
         Tip: you need to discretize the environment to the state space defined on the webpage first
         (Note that [adjoining_wall_x=0, adjoining_wall_y=0] is also the case when snake runs out of the playable board)
         '''        
-        # state = (food_dir_x, food_dir_y, adjoining_wall_x, adjoining_wall_y, adjoining_body_top, adjoining_body_bottom, adjoining_body_left, adjoining_body_right)
-        # 3. The agent then “discretizes” this new environment by generating a state based off of the new, post-action environment
+        # 3. The agent “discretizes” this new environment by generating a state based off of the new, post-action environment
         s_prime = self.generate_state(environment)
 
         # TODO Check that the snake is not past the border walls?
         
         # 1. Choose optimal action based on Q-value (or lack of exploration)
         a_prime = self.find_best_action(s_prime)
-        # 2. From the result of the action on the environment, the agent obtains a reward r_t
-        r_t = self.calculate_reward(points, dead)
-        
-        if dead and self._train: # if snake dies, don't look for optimal next step
-            self.update_q_n(s_prime, None, dead, r_t)
-            self.reset()
-            return self.a
-
         # When t = 0, initialize state and action, disregarding N and Q-table updating
         if self.s == None and self.a == None:
             self.s = s_prime
             self.a = a_prime
             return a_prime
 
+        # 2. From the result of the action on the environment, the agent obtains a reward r_t
+        r_t = self.calculate_reward(points, dead)
+        # if snake dies, don't look for optimal next step
+        if dead and self._train:
+            self.update_q_n(r_t, s_prime, None)
+            self.reset()
+            return self.a
+
         # 4. With s_t, a_t, r_t, and s_t+1, the agent can update its Q-value estimate for the state action pair Q(s_t, a_t)
-        if self._train: self.update_q_n(s_prime, a_prime, dead, r_t)
+        if self._train: self.update_q_n(r_t, s_prime, a_prime)
         
         # 5. The agent is now in state s_t+1, and the process repeats
         if r_t == 1:
@@ -133,7 +132,7 @@ class Agent:
     # Helper function to generate a state given an environment 
     # Each state in the MDP is a tuple of the form returned
     def generate_state(self, environment):
-
+        
         snake_head_x = environment[0]
         snake_head_y = environment[1]
         snake_body = environment[2]
