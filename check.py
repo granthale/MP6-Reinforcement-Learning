@@ -24,5 +24,6 @@ true_N = utils.load('data/checkpoint1_N.npy')
 Q = utils.load('checkpoint.npy')
 N = utils.load('checkpoint_N.npy')
 
+print(f"My N.sum() is: {N.sum()}, while the correct N.sum() is {true_N.sum()}")
 print(f'Your Q matrix is correct: {np.array_equal(true_Q, Q)}')
 print(f'Your N matrix is correct: {np.array_equal(true_N, N)}')

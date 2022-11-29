@@ -45,13 +45,20 @@ class Agent:
                 # else                = Q(s,a)
         argmax_list = [0,0,0,0]
         action_list = [utils.RIGHT, utils.LEFT, utils.DOWN, utils.UP]
-        for action in action_list:
-            if self.N[s_prime][action] < self.Ne:
-                argmax_list[action] = 1
-            else:
+        if self._train: # WITH EXPLORATION
+            for action in action_list:
+                if self.N[s_prime][action] < self.Ne: # if state and action haven't been explored sufficiently during training
+                    argmax_list[action] = 1
+                else:
+                    Q = self.Q[s_prime][action]
+                    argmax_list[action] = self.Q[s_prime][action]
+        else: # WITHOUT EXPLORATION
+            for action in action_list:
+                Q = self.Q[s_prime][action]
                 argmax_list[action] = self.Q[s_prime][action]
-        
+
         # Reverse list to match action_list indices
+        # In case of ties, this prioritizes R -> L -> D -> U
         argmax_list.reverse()
         
         # Choose the action at s_prime that maximizes it's Q-value
@@ -69,7 +76,7 @@ class Agent:
         r_t = -.1
         if dead:
             r_t = -1
-        elif points == self.points + 1: # if food pellet found
+        elif points > self.points: # if food pellet found
             r_t = 1
         return r_t
 
@@ -78,11 +85,11 @@ class Agent:
         self.N[self.s][self.a] += 1
 
         # b. Update Q(s_t, a_t)
-        alpha = self.C / ( self.C + self.N[self.s][self.a] )     
-        if r_t == -1: # if dead
-            self.Q[self.s][self.a] += alpha * (r_t - self.Q[self.s][self.a]) # Assuming no next move
+        alpha = self.C / ( self.C + self.N[self.s][self.a] )
+        if r_t == -1: # if dead, assume no next move
+            self.Q[self.s][self.a] += alpha * (r_t - self.Q[self.s][self.a])
         else:
-            self.Q[self.s][self.a] += alpha * (r_t - self.Q[self.s][self.a] + self.gamma * self.Q[s_prime][a_prime] )
+            self.Q[self.s][self.a] += alpha * (r_t + self.gamma * self.Q[s_prime][a_prime] - self.Q[self.s][self.a] )
 
 
     def act(self, environment, points, dead):
@@ -111,14 +118,13 @@ class Agent:
 
         # 2. From the result of the action on the environment, the agent obtains a reward r_t
         r_t = self.calculate_reward(points, dead)
-        # if snake dies, don't look for optimal next step
-        if dead and self._train:
-            self.update_q_n(r_t, s_prime, None)
+        if dead and self._train: # if snake dies, don't look for the optimal next step
+            self.update_q_n(r_t, None, None)
             self.reset()
-            return self.a
+            return None
 
         # 4. With s_t, a_t, r_t, and s_t+1, the agent can update its Q-value estimate for the state action pair Q(s_t, a_t)
-        if self._train: self.update_q_n(r_t, s_prime, a_prime)
+        elif self._train: self.update_q_n(r_t, s_prime, a_prime)
         
         # 5. The agent is now in state s_t+1, and the process repeats
         if r_t == 1:
@@ -147,9 +153,9 @@ class Agent:
         
         food_dir_y = 0
         if snake_head_y > food_y:
-            food_dir_y = 1 # if food above snake head
+            food_dir_y = 1 # food on snake head top
         elif snake_head_y < food_y:
-            food_dir_y = 2 # if food below snake head
+            food_dir_y = 2 # food on snake head bottom
 
         adjoining_wall_x = 0
         if snake_head_x == 1:
@@ -177,5 +183,5 @@ class Agent:
                 adjoining_body_left = 1 # adjoining left square has snake body
             if coord[0] - snake_head_x == 1 and coord[1] == snake_head_y:
                 adjoining_body_right = 1 # adjoining right square has snake body
-            
+        
         return (food_dir_x, food_dir_y, adjoining_wall_x, adjoining_wall_y, adjoining_body_top, adjoining_body_bottom, adjoining_body_left, adjoining_body_right)
