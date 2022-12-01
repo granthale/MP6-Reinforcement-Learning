@@ -40,14 +40,14 @@ class Agent:
         self.s = None
         self.a = None
    
-    def find_best_action(self, s_prime):
+    def find_best_action(self, s_prime, train):
         # 1. Choose optimal action based on Q-value or lack of exploration
             # action = argmax( f(Q(s,a), N(s,a)) )
                 # f( Q(s,a), N(s,a) ) = 1 if N(s,a) < N_e
                 # else                = Q(s,a)        
         best_action = 0
         q_val = -999
-        if self._train: # WITH EXPLORATION
+        if train: # WITH EXPLORATION
             for action in self.actions:
                 if self.N[s_prime][action] < self.Ne:
                     tmp = 1
@@ -80,19 +80,12 @@ class Agent:
 
     def update_q(self, r_t, s_prime):
         alpha = self.C / (self.C + self.N[self.s][self.a])
-        if r_t == -1: # if dead, assume no next move
-            self.Q[self.s][self.a] += alpha * (r_t - self.Q[self.s][self.a])
-        else:
-            maxQ = self.get_max_q(s_prime)
-            self.Q[self.s][self.a] += alpha * (r_t + self.gamma * maxQ - self.Q[self.s][self.a] )
+        maxQ = self.get_max_q(s_prime)
+        self.Q[self.s][self.a] += alpha * (r_t + self.gamma * maxQ - self.Q[self.s][self.a] )
 
     def get_max_q(self, s_prime):
-        argmax_list = [0,0,0,0]
-        for action in self.actions:
-            argmax_list[action] = self.Q[s_prime][action]
-        
-        return max(argmax_list)
-
+        best_action = self.find_best_action(s_prime, False)
+        return self.Q[s_prime][best_action]
 
     def act(self, environment, points, dead):
         '''
@@ -101,7 +94,6 @@ class Agent:
         :param points: float, the current points from environment
         :param dead: boolean, if the snake is dead
         :return: chosen action between utils.UP, utils.DOWN, utils.LEFT, utils.RIGHT
-
         Tip: you need to discretize the environment to the state space defined on the webpage first
         (Note that [adjoining_wall_x=0, adjoining_wall_y=0] is also the case when snake runs out of the playable board)
         '''        
@@ -112,18 +104,16 @@ class Agent:
             self.N[self.s][self.a] += 1
             self.update_q(r_t, s_prime)
         
-        if not dead:
+        if dead:
+            self.reset()
+        else:
             self.s = s_prime
             self.points = points
-        else:
-            self.reset()
-            return 0
+            # 1. Choose optimal action based on Q-value (or lack of exploration)
+            a_prime = self.find_best_action(s_prime, self._train)
+            self.a = a_prime
 
-        # 1. Choose optimal action based on Q-value (or lack of exploration)
-        a_prime = self.find_best_action(s_prime)
-        if self._train and self.a != None and self.s != None: self.N[s_prime][a_prime] += 1
-        self.a = a_prime
-        return a_prime
+        return self.a
 
 
     # Helper function to generate a state given an environment 
@@ -153,7 +143,7 @@ class Agent:
         if hy == 1:
             awy = 1 # wall on snake head top
         if hy == utils.DISPLAY_HEIGHT - 2: # -2 b/c of 0-indexing
-            awx = 2 # wall on snake head bottom
+            awy = 2 # wall on snake head bottom
 
         # Check where the snake's body is in relation to it's head
         adtop = 0

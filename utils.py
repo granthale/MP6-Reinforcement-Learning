@@ -10,8 +10,6 @@ DOWN = 1
 LEFT = 2
 RIGHT = 3
 
-GRID_SIZE = 1
-
 # Colors for pygame
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
