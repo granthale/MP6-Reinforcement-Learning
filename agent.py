@@ -1,6 +1,8 @@
 import numpy as np
 import utils
 
+## SHOULD I BE NOT UPDATING WITH Q_MAX IF DEAD?
+
 class Agent:    
     def __init__(self, actions, Ne=40, C=40, gamma=0.7):
         # HINT: You should be utilizing all of these
@@ -42,32 +44,31 @@ class Agent:
         # 1. Choose optimal action based on Q-value or lack of exploration
             # action = argmax( f(Q(s,a), N(s,a)) )
                 # f( Q(s,a), N(s,a) ) = 1 if N(s,a) < N_e
-                # else                = Q(s,a)
-        argmax_list = [0,0,0,0]
-        action_list = [utils.RIGHT, utils.LEFT, utils.DOWN, utils.UP]
+                # else                = Q(s,a)        
+        best_action = 0
+        q_val = -999
         if self._train: # WITH EXPLORATION
-            for action in action_list:
-                if self.N[s_prime][action] < self.Ne: # if state and action haven't been explored sufficiently during training
-                    argmax_list[action] = 1
+            for action in self.actions:
+                if self.N[s_prime][action] < self.Ne:
+                    tmp = 1
+                    if tmp >= q_val:
+                        q_val = tmp
+                        best_action = action
                 else:
-                    argmax_list[action] = self.Q[s_prime][action]
+                    tmp = self.Q[s_prime][action]
+                    if tmp >= q_val:
+                        q_val = tmp
+                        best_action = action
 
         else: # WITHOUT EXPLORATION
-            for action in action_list:
-                argmax_list[action] = self.Q[s_prime][action]
-
-        # Reverse list to match action_list indices : in case of ties, this prioritizes R -> L -> D -> U
-        argmax_list.reverse()
-        
-        max = argmax_list[0]
-        best_action = action_list[0]
-        for idx, val in enumerate(argmax_list):
-            if val > max:
-                max = val
-                best_action = action_list[idx]
+            for action in self.actions:
+                tmp = self.Q[s_prime][action]
+                if tmp >= q_val:
+                    q_val = tmp
+                    best_action = action
 
         return best_action
-
+    
     def calculate_reward(self, points, dead):
         # 2. From the result of the action on the environment, the agent obtains a reward r_t
         r_t = -.1
@@ -77,16 +78,20 @@ class Agent:
             r_t = 1
         return r_t
 
-    def update_q_n(self, r_t, s_prime, a_prime):
-        # a. Update N(s_t, a_t)
-        self.N[self.s][self.a] += 1
-
-        # b. Update Q(s_t, a_t)
-        alpha = self.C / ( self.C + self.N[self.s][self.a] )
+    def update_q(self, r_t, s_prime):
+        alpha = self.C / (self.C + self.N[self.s][self.a])
         if r_t == -1: # if dead, assume no next move
             self.Q[self.s][self.a] += alpha * (r_t - self.Q[self.s][self.a])
         else:
-            self.Q[self.s][self.a] += alpha * (r_t + self.gamma * self.Q[s_prime][a_prime] - self.Q[self.s][self.a] )
+            maxQ = self.get_max_q(s_prime)
+            self.Q[self.s][self.a] += alpha * (r_t + self.gamma * maxQ - self.Q[self.s][self.a] )
+
+    def get_max_q(self, s_prime):
+        argmax_list = [0,0,0,0]
+        for action in self.actions:
+            argmax_list[action] = self.Q[s_prime][action]
+        
+        return max(argmax_list)
 
 
     def act(self, environment, points, dead):
@@ -100,42 +105,30 @@ class Agent:
         Tip: you need to discretize the environment to the state space defined on the webpage first
         (Note that [adjoining_wall_x=0, adjoining_wall_y=0] is also the case when snake runs out of the playable board)
         '''        
-        # 2. From the result of the previous action on the environment (self.s, self.a), the agent obtains a reward r_t
-        r_t = self.calculate_reward(points, dead)
-        if dead and self._train: # if snake dies, don't look for the optimal next step
-            self.update_q_n(r_t, None, None)
-            self.reset()
-            return None
-
-        # 3. The agent “discretizes” this new environment by generating a state based off of the new, post-action environment
         s_prime = self.generate_state(environment)
-
-        # TODO Check that the snake is not past the border walls?
         
+        if self._train and self.a != None and self.s != None:
+            r_t = self.calculate_reward(points, dead)
+            self.N[self.s][self.a] += 1
+            self.update_q(r_t, s_prime)
+        
+        if not dead:
+            self.s = s_prime
+            self.points = points
+        else:
+            self.reset()
+            return 0
+
         # 1. Choose optimal action based on Q-value (or lack of exploration)
         a_prime = self.find_best_action(s_prime)
-        # When t = 0, initialize state and action, disregarding N and Q-table updating
-        if self.s == None and self.a == None:
-            self.s = s_prime
-            self.a = a_prime
-            return a_prime
-
-        # 4. With s_t, a_t, r_t, and s_t+1, the agent can update its Q-value estimate for the state action pair Q(s_t, a_t)
-        if self._train: self.update_q_n(r_t, s_prime, a_prime)
-        
-        # 5. The agent is now in state s_t+1, and the process repeats
-        if r_t == 1: # if food pellet found
-            self.points += r_t # increment global points
-        self.s = s_prime
+        if self._train and self.a != None and self.s != None: self.N[s_prime][a_prime] += 1
         self.a = a_prime
-
         return a_prime
 
 
     # Helper function to generate a state given an environment 
     # Each state in the MDP is a tuple of the form returned
     def generate_state(self, environment):
-        
         hx, hy, body, fx, fy = environment
         
         fdx = 0
