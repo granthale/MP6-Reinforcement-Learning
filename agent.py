@@ -50,18 +50,15 @@ class Agent:
                 if self.N[s_prime][action] < self.Ne: # if state and action haven't been explored sufficiently during training
                     argmax_list[action] = 1
                 else:
-                    Q = self.Q[s_prime][action]
                     argmax_list[action] = self.Q[s_prime][action]
+
         else: # WITHOUT EXPLORATION
             for action in action_list:
-                Q = self.Q[s_prime][action]
                 argmax_list[action] = self.Q[s_prime][action]
 
-        # Reverse list to match action_list indices
-        # In case of ties, this prioritizes R -> L -> D -> U
+        # Reverse list to match action_list indices : in case of ties, this prioritizes R -> L -> D -> U
         argmax_list.reverse()
         
-        # Choose the action at s_prime that maximizes it's Q-value
         max = argmax_list[0]
         best_action = action_list[0]
         for idx, val in enumerate(argmax_list):
@@ -103,6 +100,13 @@ class Agent:
         Tip: you need to discretize the environment to the state space defined on the webpage first
         (Note that [adjoining_wall_x=0, adjoining_wall_y=0] is also the case when snake runs out of the playable board)
         '''        
+        # 2. From the result of the previous action on the environment (self.s, self.a), the agent obtains a reward r_t
+        r_t = self.calculate_reward(points, dead)
+        if dead and self._train: # if snake dies, don't look for the optimal next step
+            self.update_q_n(r_t, None, None)
+            self.reset()
+            return None
+
         # 3. The agent “discretizes” this new environment by generating a state based off of the new, post-action environment
         s_prime = self.generate_state(environment)
 
@@ -116,19 +120,12 @@ class Agent:
             self.a = a_prime
             return a_prime
 
-        # 2. From the result of the action on the environment, the agent obtains a reward r_t
-        r_t = self.calculate_reward(points, dead)
-        if dead and self._train: # if snake dies, don't look for the optimal next step
-            self.update_q_n(r_t, None, None)
-            self.reset()
-            return None
-
         # 4. With s_t, a_t, r_t, and s_t+1, the agent can update its Q-value estimate for the state action pair Q(s_t, a_t)
-        elif self._train: self.update_q_n(r_t, s_prime, a_prime)
+        if self._train: self.update_q_n(r_t, s_prime, a_prime)
         
         # 5. The agent is now in state s_t+1, and the process repeats
-        if r_t == 1:
-            self.points += r_t # if food pellet found, increment global points
+        if r_t == 1: # if food pellet found
+            self.points += r_t # increment global points
         self.s = s_prime
         self.a = a_prime
 
@@ -139,49 +136,45 @@ class Agent:
     # Each state in the MDP is a tuple of the form returned
     def generate_state(self, environment):
         
-        snake_head_x = environment[0]
-        snake_head_y = environment[1]
-        snake_body = environment[2]
-        food_x = environment[3]
-        food_y = environment[4]
+        hx, hy, body, fx, fy = environment
         
-        food_dir_x = 0
-        if snake_head_x > food_x:
-            food_dir_x = 1 # food on snake head left
-        elif snake_head_x < food_x:
-            food_dir_x = 2 # food on snake head right
+        fdx = 0
+        if hx > fx:
+            fdx = 1 # food on snake head left
+        elif hx < fx:
+            fdx = 2 # food on snake head right
         
-        food_dir_y = 0
-        if snake_head_y > food_y:
-            food_dir_y = 1 # food on snake head top
-        elif snake_head_y < food_y:
-            food_dir_y = 2 # food on snake head bottom
+        fdy = 0
+        if hy > fy:
+            fdy = 1 # food on snake head top
+        elif hy < fy:
+            fdy = 2 # food on snake head bottom
 
-        adjoining_wall_x = 0
-        if snake_head_x == 1:
-            adjoining_wall_x = 1 # wall on snake head left
-        if snake_head_x == utils.DISPLAY_WIDTH - 2: # -2 b/c of 0-indexing
-            adjoining_wall_x = 2 # wall on snake head right
+        awx = 0
+        if hx == 1:
+            awx = 1 # wall on snake head left
+        if hx == utils.DISPLAY_WIDTH - 2: # -2 b/c of 0-indexing
+            awx = 2 # wall on snake head right
         
-        adjoining_wall_y = 0
-        if snake_head_y == 1:
-            adjoining_wall_y = 1 # wall on snake head top
-        if snake_head_y == utils.DISPLAY_HEIGHT - 2: # -2 b/c of 0-indexing
-            adjoining_wall_x = 2 # wall on snake head bottom
+        awy = 0
+        if hy == 1:
+            awy = 1 # wall on snake head top
+        if hy == utils.DISPLAY_HEIGHT - 2: # -2 b/c of 0-indexing
+            awx = 2 # wall on snake head bottom
 
         # Check where the snake's body is in relation to it's head
-        adjoining_body_top = 0
-        adjoining_body_bottom = 0
-        adjoining_body_left = 0
-        adjoining_body_right = 0
-        for coord in snake_body:
-            if coord[1] - snake_head_y == -1 and coord[0] == snake_head_x:
-                adjoining_body_top = 1 # adjoining top square has snake body
-            if coord[1] - snake_head_y == 1 and coord[0] == snake_head_x:
-                adjoining_body_bottom = 1 # adjoining bottom square has snake body
-            if coord[0] - snake_head_x == -1 and coord[1] == snake_head_y:
-                adjoining_body_left = 1 # adjoining left square has snake body
-            if coord[0] - snake_head_x == 1 and coord[1] == snake_head_y:
-                adjoining_body_right = 1 # adjoining right square has snake body
+        adtop = 0
+        adbot = 0
+        adleft = 0
+        adright = 0
+        for i in body:
+            if i[1] - hy == -1 and i[0] == hx:
+                adtop = 1 # adjoining top square has snake body
+            if i[1] - hy == 1 and i[0] == hx:
+                adbot = 1 # adjoining bottom square has snake body
+            if i[0] - hx == -1 and i[1] == hy:
+                adleft = 1 # adjoining left square has snake body
+            if i[0] - hx == 1 and i[1] == hy:
+                adright = 1 # adjoining right square has snake body
         
-        return (food_dir_x, food_dir_y, adjoining_wall_x, adjoining_wall_y, adjoining_body_top, adjoining_body_bottom, adjoining_body_left, adjoining_body_right)
+        return (fdx, fdy, awx, awy, adtop, adbot, adleft, adright)

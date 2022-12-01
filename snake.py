@@ -2,6 +2,9 @@ import random
 import pygame
 import utils
 
+import os
+os.environ["SDL_VIDEODRIVER"] = "dummy"
+
 GRID_SIZE = 1
 LENGTH_FACTOR = 40 # for all lengths, multiply it with this factor for pygame display
 
